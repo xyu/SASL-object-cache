@@ -1,5 +1,7 @@
 <?php
 
+include( ABSPATH . "wp-content/MemcacheSASL.php" );
+
 /*
 Plugin Name: Memcached
 Description: Memcached backend for the WP Object Cache.
@@ -58,9 +60,24 @@ function wp_cache_get($key, $group = '', $force = false) {
 }
 
 function wp_cache_init() {
-	global $wp_object_cache;
+	global $wp_object_cache, $sasl_memcached_config;
 
 	$wp_object_cache = new WP_Object_Cache();
+
+	if ( isset( $sasl_memcached_config ) && is_array( $sasl_memcached_config ) ) {
+		$wp_object_cache->load_from_config( $sasl_memcached_config );
+	} else {
+		$wp_object_cache->load_from_config(array(
+			'default' => array(
+				array(
+					'host' => '127.0.0.1',
+					'port' => '11211',
+					'user' => null,
+					'pass' => null,
+				),
+			),
+		));
+	}
 }
 
 function wp_cache_replace($key, $data, $group = '', $expire = 0) {
@@ -124,7 +141,7 @@ class WP_Object_Cache {
 
 		$mc =& $this->get_mc($group);
 		$expire = ($expire == 0) ? $this->default_expiration : $expire;
-		$result = $mc->add($key, $data, false, $expire);
+		$result = $mc->add($key, $data, $expire);
 
 		if ( false !== $result ) {
 			@ ++$this->stats['add'];
@@ -166,9 +183,8 @@ class WP_Object_Cache {
 	}
 
 	function close() {
-
 		foreach ( $this->mc as $bucket => $mc )
-			$mc->close();
+			$mc->quit();
 	}
 
 	function delete($id, $group = 'default') {
@@ -281,7 +297,7 @@ class WP_Object_Cache {
 		if ( is_object( $data ) )
 			$data = clone $data;
 
-		$result = $mc->replace($key, $data, false, $expire);
+		$result = $mc->replace($key, $data, $expire);
 		if ( false !== $result )
 			$this->cache[$key] = $data;
 		return $result;
@@ -302,7 +318,7 @@ class WP_Object_Cache {
 
 		$expire = ($expire == 0) ? $this->default_expiration : $expire;
 		$mc =& $this->get_mc($group);
-		$result = $mc->set($key, $data, false, $expire);
+		$result = $mc->set($key, $data, $expire);
 
 		return $result;
 	}
@@ -359,36 +375,21 @@ class WP_Object_Cache {
 		return $this->mc['default'];
 	}
 
-	function failure_callback($host, $port) {
-		//error_log("Connection failure for $host:$port\n", 3, '/tmp/memcached.txt');
+	function load_from_config(array $config) {
+		foreach ( $config as $bucket => $servers ) {
+			$this->mc[$bucket] = new MemcacheSASL();
+			foreach ( $servers as $server ) {
+				// TODO: MemcacheSASL only supports connection to 1 server, only last server in loop is used.
+				$this->mc[$bucket]->addServer( $server['host'], $server['port'] );
+				if ( !empty( $server['user'] ) ) {
+					$this->mc[$bucket]->setSaslAuthData( $server['user'], $server['pass'] );
+				}
+				// TODO: MemcacheSASL does not support setCompressThreshold() don't compress anything for now.
+			}
+		}
 	}
 
 	function WP_Object_Cache() {
-		global $memcached_servers;
-
-		if ( isset($memcached_servers) )
-			$buckets = $memcached_servers;
-		else
-			$buckets = array('127.0.0.1:11211');
-
-		reset($buckets);
-		if ( is_int( key($buckets) ) )
-			$buckets = array('default' => $buckets);
-
-		foreach ( $buckets as $bucket => $servers) {
-			$this->mc[$bucket] = new Memcache();
-			foreach ( $servers as $server  ) {
-				list ( $node, $port ) = explode(':', $server);
-				if ( !$port )
-					$port = ini_get('memcache.default_port');
-				$port = intval($port);
-				if ( !$port )
-					$port = 11211;
-				$this->mc[$bucket]->addServer($node, $port, true, 1, 1, 15, true, array($this, 'failure_callback'));
-				$this->mc[$bucket]->setCompressThreshold(20000, 0.2);
-			}
-		}
-
 		global $blog_id, $table_prefix;
 		$this->global_prefix = '';
 		$this->blog_prefix = '';
@@ -401,4 +402,3 @@ class WP_Object_Cache {
 		$this->cache_misses =& $this->stats['add'];
 	}
 }
-?>
