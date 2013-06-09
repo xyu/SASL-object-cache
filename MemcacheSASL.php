@@ -248,6 +248,19 @@ class MemcacheSASL
         return FALSE;
     }
 
+    public function flush()
+    {
+        $sent = $this->_send(array(
+                    'opcode' => 0x08
+                    ));
+        $data = $this->_recv();
+        if ($data['status'] == 0) {
+            return TRUE;
+        }
+
+        return FALSE;
+    }
+
     public function replace($key, $value, $expiration = 0)
     {
         list($flag, $value) = $this->_processValue(0, $value);
