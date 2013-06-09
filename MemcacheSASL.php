@@ -96,6 +96,10 @@ class MemcacheSASL
     {
     }
 
+    public function __destruct()
+    {
+        $this->quit();
+    }
 
     public function listMechanisms()
     {
@@ -252,6 +256,19 @@ class MemcacheSASL
     {
         $sent = $this->_send(array(
                     'opcode' => 0x08
+                    ));
+        $data = $this->_recv();
+        if ($data['status'] == 0) {
+            return TRUE;
+        }
+
+        return FALSE;
+    }
+
+    public function quit()
+    {
+        $sent = $this->_send(array(
+                    'opcode' => 0x07
                     ));
         $data = $this->_recv();
         if ($data['status'] == 0) {
