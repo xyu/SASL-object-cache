@@ -1,12 +1,12 @@
 <?php
 
 /**
- *  Plugin Name: SASL Memcached
+ *  Plugin Name: SASL Object Cache
  *  Description: SASL enabled Memcached backend for the WP Object Cache. A fork
  *  of "Memcached" (http://wordpress.org/plugins/memcached/) and uses
  *  "PHPMemcacheSASL" (https://github.com/aarondfrancis/PHPMemcacheSASL)
  *  Version: 0.0.1
- *  Plugin URI:
+ *  Plugin URI: https://github.com/xyu/SASL-object-cache
  *  Author: Ryan Boren, Denis de Bernardy, Matt Martz, Ronny Wang, Xiao Yu
  *
  *  Install this file to wp-content/object-cache.php along with MemcacheSASL.php
