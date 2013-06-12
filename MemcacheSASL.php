@@ -58,6 +58,9 @@ class MemcacheSASL
 
     protected function _show_request($data)
     {
+        if (empty($data)) {
+            return array();
+        }
         $array = unpack($this->_response_format, $data);
         return $array;
     }
